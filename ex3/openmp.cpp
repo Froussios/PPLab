@@ -10,6 +10,15 @@
 
 using namespace std;
 
+class stopwatch {
+	unsigned int start, end;
+public:
+	stopwatch() { restart(); }
+	void restart() { start = clock(); }
+	void stop() { end = clock(); }
+	unsigned int elapsed() { return end - start; }
+};
+
 
 void readData(string fileName, vector<int>& container) {
 	ifstream fdata(fileName);
@@ -43,7 +52,8 @@ int log2(int i) {
 
 int main(int argc, char *args[])
 {
-	cout << "Start" << endl;
+	cout << "Started" << endl;
+	stopwatch swRead, swParallel, swWrite;
 
 	// Read arguments
 	string inFilename("data.txt"), outFilename("output.txt");
@@ -63,23 +73,29 @@ int main(int argc, char *args[])
 	for (int i = 0; i < list.size(); i++)
 		list[i]--; // Switch to zero-based
 
-	//print(list);
-
 	// Calculate
 	int *distance = new int[n];
 	int *distanceNew = new int[n];
 	int *jumplist = new int[n];
 	int *jumplistNew = new int[n];
+	int i;
+
+	swRead.stop();
+	swParallel.restart();
+
+	#pragma omp parallel private(distance, distanceNew, jumplist, jumplistNew, i) // pointers are private, data is isn't
 	{
+		#pragma omp for schedule(static) nowait
 		// initialize
-		for (int i = 0; i < list.size(); i++) {
+		for (int i = 0; i < n; i++) {
 			distance[i] = distanceNew[i] = (list[i] == -1) ? 0 : 1;
 			jumplist[i] = jumplistNew[i] = list[i];
 		}
 
 		// jump pointers
 		for (int y = 0; y < logn ; y++) {
-			for (int i = 0; i < n; i++) {
+			#pragma omp for schedule(static) nowait
+			for (i = 0; i < n; i++) {
 				if (jumplist[i] != -1) {
 					distanceNew[i] = distance[i] + distance[jumplist[i]];
 					jumplistNew[i] = jumplist[jumplist[i]];
@@ -96,13 +112,32 @@ int main(int argc, char *args[])
 		}
 	}
 
+	swParallel.stop();
+	swWrite.restart();
+
+	// Write result to file
+	fstream fout(outFilename, fstream::out);
+	for (int i = 0; i < n; i++)
+		fout << distance[i] << " ";
+	fout << endl;
+	fout.close();
+
+	swWrite.stop();
+
 #ifndef NDEBUG
 	bool completed = true;
 	for (int i = 0; i < n; i++)
 		completed = completed && jumplist[i] == -1;
-	cout << "Jumping compelted: " << ((completed) ? "true" : "false") << endl;
+	if (!completed)
+		cout << "ERROR: Jumps not completed" << endl;
+	//print(jumplist, n);
 	print(distance, n);
 #endif
+
+	cout << "Completed" << endl;
+	cout << swRead.elapsed() << "ms read" << endl;
+	cout << swParallel.elapsed() << "ms parallel" << endl;
+	cout << swWrite.elapsed() << "ms write" << endl;
 
 #ifdef _WIN32
 	string dummy;
