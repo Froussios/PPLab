@@ -105,9 +105,10 @@ int main(int argc, char *args[])
 					jumplistNew[i] = jumplist[i];
 				}
 			}
-			
+
 			#pragma omp single
 			{
+				// swap
 				swap(jumplist, jumplistNew);
 				swap(distance, distanceNew);
 			}

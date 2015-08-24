@@ -129,7 +129,7 @@ int main(int argc, char *args[])
 	// Write output
 	{
 		cout << "Writing output to " << outfile << endl;
-		ofstream fout(outfile.c_str());
+		ofstream fout(outfile);
 		for (int i = 0; i < AB.size(); i++)
 			fout << AB[i] << " ";
 		fout << endl;
