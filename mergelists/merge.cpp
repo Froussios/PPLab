@@ -3,13 +3,16 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <math.h>
+#include <iostream>
 #include <sys/time.h>
+
+using namespace std;
 
 // Number of threads
 #define NUM_THREADS 32
 
 // Number of iterations
-#define TIMES 1000
+#define TIMES 1 // TODO increase
 
 // Input Size
 #define NSIZE 7
@@ -34,6 +37,9 @@ int S[NMAX];
 // Subset
 int A[NMAX];
 int B[NMAX];
+int A_AB[NMAX];
+int B_AB[NMAX];
+int AB[NMAX];
 int sizeA;
 int sizeB;
 
@@ -65,6 +71,8 @@ void init(int n){
 }
 
 void seq_function(){
+	int i;
+
 	// Do merge
 	{
 		// Calculate (A:AB)
@@ -88,6 +96,12 @@ void seq_function(){
 void* par_function(void* a){
 	/* The code for threaded computation */
 	// Perform operations on B
+	
+	pthread_barrier_wait(&barr);
+	
+	
+	
+	pthread_exit(0);
 }
 
 int main (int argc, char *argv[])
@@ -103,9 +117,9 @@ int main (int argc, char *argv[])
 
 	/* Generate a seed input */
 	srand ( time(NULL) );
-	s[0] = rand() % 5;
+	S[0] = rand() % 5;
 	for(k=1; k<NMAX; k++){
-		s[k] = s[k-1] + 1 + (rand() % 5); // Seed will increasing
+		S[k] = S[k-1] + 1 + (rand() % 5); // Seed will increasing
 	}
 
    	/* Initialize and set thread detached attribute */
@@ -129,6 +143,14 @@ int main (int argc, char *argv[])
 		gettimeofday (&endt, NULL);
 		result.tv_usec = (endt.tv_sec*1000000+endt.tv_usec) - (startt.tv_sec*1000000+startt.tv_usec);
 		printf(" %ld.%06ld | ", result.tv_usec/1000000, result.tv_usec%1000000);
+		
+		// verify correctness
+		#ifndef NDEBUG
+		bool correct = true;
+		for (int i=1 ; i < sizeA + sizeB ; i++)
+			if (AB[i-1] > AB[i])
+				correct = false;
+		#endif
 
 		/* Run threaded algorithm(s) */
 		for(nt=1; nt<NUM_THREADS; nt=nt<<1){
@@ -151,7 +173,7 @@ int main (int argc, char *argv[])
 				x[j].n=n;  //input size
 				pthread_create(&callThd[j-1], &attr, par_function, (void *)&x[j]);
 			}
-
+			
 			gettimeofday (&startt, NULL);
 			for (t=0; t<TIMES; t++) 
 			{
@@ -176,8 +198,20 @@ int main (int argc, char *argv[])
 			}
    			result.tv_usec += (endt.tv_sec*1000000+endt.tv_usec) - (startt.tv_sec*1000000+startt.tv_usec);
 			printf(" %ld.%06ld | ", result.tv_usec/1000000, result.tv_usec%1000000);
+			
+			#ifndef NDEBUG
+			bool correct = true;
+			for (int i=1 ; i < sizeA + sizeB ; i++)
+				if (AB[i-1] > AB[i])
+					correct = false;
+			#endif
 		}
 		printf("\n");
+		
+		#ifndef NDEBUG
+		if (!correct)
+			cerr << "SEQ FAILED!!!" << endl;
+		#endif
 	}
 	pthread_exit(NULL);
 }
