@@ -1,14 +1,10 @@
-all: openmp sequential pthreads
+all: merge openmp
+
+merge: merge.cpp
+	g++ merge.cpp -pthread -o merge
 
 openmp: openmp.cpp
 	g++ openmp.cpp -fopenmp -o openmp
 
-sequential: sequential.cpp
-	g++ sequential.cpp -o sequential
-
-pthreads: pthreads.cpp
-	g++ pthreads.cpp -o pthreads
-
 clean:
-	rm openmp sequential pthreads
-
+	rm merge openmp
