@@ -16,7 +16,7 @@ using namespace std;
 #define NUM_THREADS 32
 
 // Number of iterations
-#define TIMES 10 // TODO increase
+#define TIMES 100 // TODO increase
 
 // Input Size
 #define NSIZE 7
@@ -40,8 +40,6 @@ pthread_barrier_t completed_barr, internal_barr;
 // Subset
 int A[NMAX];
 int B[NMAX];
-int A_AB[NMAX];
-int B_AB[NMAX];
 int AB[2*NMAX];
 
 // calculate rank(item : a)
@@ -65,28 +63,26 @@ void init(int na, int nb){
 	#ifndef NDEBUG
 	// Initialise all tables
 	for (int i=0 ; i<NMAX ; i++)
-		A_AB[i] = B_AB[i] = AB[i] = AB[i*2] = -1;
+		AB[i] = AB[i*2] = -1;
 	#endif
 }
 
 void seq_function(int sizeA, int sizeB){
 	int i;
 
-	// Calculate (A:AB)
 	for (i = 0; i < sizeA; i++) {
-		A_AB[i] = i + 1 + binaryRank(B, 0, sizeB, A[i]);
+		// Calculate (A[i]:AB)
+		int A_AB_i = i + 1 + binaryRank(B, 0, sizeB, A[i]);
+		// put A[i] in AB
+		AB[A_AB_i - 1] = A[i];
 	}
 
-	// Calculate (B:AB)
 	for (i = 0; i < sizeB; i++) {
-		B_AB[i] = i + 1 + binaryRank(A, 0, sizeA, B[i]);
+		// Calculate (B[i]:AB)
+		int B_AB_i = i + 1 + binaryRank(A, 0, sizeA, B[i]);
+		// put B[i] in AB
+		AB[B_AB_i - 1] = B[i];
 	}
-	
-	// Merge
-	for (i = 0; i < sizeA; i++)
-		AB[A_AB[i] - 1] = A[i];
-	for (i = 0; i < sizeB; i++)
-		AB[B_AB[i] - 1] = B[i];
 }
 
 void* par_function(void* a){
@@ -115,19 +111,15 @@ void* par_function(void* a){
 	
 		// Calculate (A:AB)
 		for (i = firstItemA; i < lastItemA; i++) {
-			A_AB[i] = i + 1 + binaryRank(B, 0, sizeB, A[i]);
+			int A_AB_i = i + 1 + binaryRank(B, 0, sizeB, A[i]);
+			AB[A_AB_i - 1] = A[i];
 		}
 
 		// Calculate (B:AB)
 		for (i = firstItemB; i < lastItemB; i++) {
-			B_AB[i] = i + 1 + binaryRank(A, 0, sizeA, B[i]);
+			int B_AB_i = i + 1 + binaryRank(A, 0, sizeA, B[i]);
+			AB[B_AB_i - 1] = B[i];
 		}
-
-		// Merge
-		for (i = firstItemA; i < lastItemA; i++)
-			AB[A_AB[i] - 1] = A[i];
-		for (i = firstItemB; i < lastItemB; i++)
-			AB[B_AB[i] - 1] = B[i];
 	}
 	
 	pthread_barrier_wait(&completed_barr);
