@@ -159,7 +159,7 @@ int main (int argc, char *argv[])
 	printf("|NSize|Iterations|Seq|Th01|Th02|Th04|Th08|Par16|\n");
 
 	// for each input size
-	for(c=0; c<NSIZE; c++){
+	for(c=0; c<NSIZE; c++){ // TODO to NSIZE
 		nA=ANs[c];
 		nB=BNs[c];
 		printf("| %d-%d | %d |",nA,nB,TIMES);
