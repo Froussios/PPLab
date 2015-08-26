@@ -37,12 +37,6 @@ pthread_t callThd[NUM_THREADS];
 pthread_mutex_t mutexpm;
 pthread_barrier_t completed_barr, internal_barr;
 
-// Seed Input
-// TODO directly onto A and B
-// A sorted array
-int SeedA[NMAX];
-int SeedB[NMAX];
-
 // Subset
 int A[NMAX];
 int B[NMAX];
@@ -65,20 +59,8 @@ int binaryRank(int a[], int start, int end, int item) {
 		return binaryRank(a, start, mid, item);
 }
 
-// TODO remove
-string print(int a[], int n) {
-	ostringstream oss;
-	for (int i=0 ; i<n ; i++)
-		oss << setw(3) << a[i] << ' ';
-	return oss.str();
-}
-
 // Initialize subset
 void init(int na, int nb){
-	for (int i=0 ; i<na ; i++)
-		A[i] = SeedA[i];
-	for (int i=0 ; i<nb ; i++)
-		B[i] = SeedB[i];
 	
 	#ifndef NDEBUG
 	// Initialise all tables
@@ -163,20 +145,20 @@ int main (int argc, char *argv[])
   	result.tv_sec = 0;
   	result.tv_usec= 0;
 
-	/* Generate a seed input */
+	/* Generate input */
 	// Generate two sorted lists with no common items
 	srand ( time(NULL) );
 	int ia=0, ib=0;
 	int number = rand() % 5;
 	while (ia < NMAX && ib < NMAX)
 		if (rand() % 5 > 0) //A is 4x larger than B 
-			SeedA[ia++] = number = number + 1 + (rand() % 5);
+			A[ia++] = number = number + 1 + (rand() % 5);
 		else
-			SeedB[ib++] = number = number + 1 + (rand() % 5);
+			B[ib++] = number = number + 1 + (rand() % 5);
 	while (ia < NMAX)
-		SeedA[ia++] = number = number + 1 + (rand() % 5);
+		A[ia++] = number = number + 1 + (rand() % 5);
 	while (ib < NMAX)
-		SeedB[ib++] = number = number + 1 + (rand() % 5);
+		B[ib++] = number = number + 1 + (rand() % 5);
 
    	/* Initialize and set thread detached attribute */
    	pthread_attr_init(&attr);
