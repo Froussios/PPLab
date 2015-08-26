@@ -82,9 +82,7 @@ int main(int argc, char *args[])
 
 	swInput.stop();
 	swParallel.restart();
-
-	vector<int> A_AB(A.size());
-	vector<int> B_AB(B.size());
+	
 	vector<int> AB(A.size() + B.size());
 	int i;
 
@@ -96,27 +94,21 @@ int main(int argc, char *args[])
 	cout << "Crunching numbers..." << endl;
 
 	// Do merge
-	#pragma omp parallel shared(A, B, AB, A_AB, B_AB) private(i)
+	#pragma omp parallel shared(A, B, AB) private(i)
 	{
 		// Calculate (A:AB)
 		#pragma omp for schedule(static) nowait
 		for (i = 0; i < A.size(); i++) {
-			A_AB[i] = i + 1 + binaryRank(B, 0, B.size(), A[i]);
+			int rankAB = i + 1 + binaryRank(B, 0, B.size(), A[i]);
+			AB[rankAB - 1] = A[i];
 		}
 
 		// Calculate (B:AB)
 		#pragma omp for schedule(static) nowait
 		for (i = 0; i < B.size(); i++) {
-			B_AB[i] = i + 1 + binaryRank(A, 0, A.size(), B[i]);
+			int rankAB = i + 1 + binaryRank(A, 0, A.size(), B[i]);
+			AB[rankAB - 1] = B[i];
 		}
-
-		// Merge
-		#pragma omp for schedule(static) 
-		for (i = 0; i < A.size(); i++)
-			AB[A_AB[i] - 1] = A[i];
-		#pragma omp for schedule(static) nowait
-		for (i = 0; i < B.size(); i++)
-			AB[B_AB[i] - 1] = B[i];
 	}
 
 	swParallel.stop();
