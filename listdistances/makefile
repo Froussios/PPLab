@@ -1,14 +1,11 @@
-all: openmp sequential pthreads
+all: distances openmp
+
+distances: distances.cpp
+	g++ distances.cpp -pthread -o distances -DNDEBUG
 
 openmp: openmp.cpp
-	g++ openmp.cpp -fopenmp -o openmp
-
-sequential: sequential.cpp
-	g++ sequential.cpp -o sequential
-
-pthreads: pthreads.cpp
-	g++ pthreads.cpp -o pthreads
+	g++ openmp.cpp -fopenmp -o openmp -DNDEBUG
 
 clean:
-	rm openmp sequential pthreads
+	rm distances openmp
 
