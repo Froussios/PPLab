@@ -120,9 +120,11 @@ void* par_function(void* a){
 			int B_AB_i = i + 1 + binaryRank(A, 0, sizeA, B[i]);
 			AB[B_AB_i - 1] = B[i];
 		}
+		
+		// Iteration completed
+		pthread_barrier_wait(&completed_barr);
 	}
 	
-	pthread_barrier_wait(&completed_barr);
 	pthread_exit(0);
 }
 
@@ -211,9 +213,11 @@ int main (int argc, char *argv[])
 			for (t=0; t<TIMES; t++) 
 			{
 				init(nA, nB);
+				// Threads wait for initialisation to complete
 				pthread_barrier_wait(&internal_barr);
+				// Main thread waits before resetting input
+				pthread_barrier_wait(&completed_barr);
 			}
-			pthread_barrier_wait(&completed_barr);
 			gettimeofday (&endt, NULL);
 
 			/* Wait on the other threads */
