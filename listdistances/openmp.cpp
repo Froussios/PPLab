@@ -1,3 +1,4 @@
+#include <omp.h>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -5,10 +6,29 @@
 #include <string>
 #include <iterator>
 #include <vector>
+#include <algorithm>
 #include <ctime>
-
+#include <assert.h>
 
 using namespace std;
+
+// Test repetitions
+#define TIMES 10
+
+// Input Size
+#define NSIZE 7
+#define NMAX 262144
+int Ns[NSIZE] = {4096, 8192, 16384, 32768, 65536, 131072, 262144};
+
+// Thread configurations
+#define MAXTHREADS 8
+
+int list[NMAX];
+int distance1[NMAX];
+int distance2[NMAX];
+int jumplist1[NMAX];
+int jumplist2[NMAX];
+
 
 class stopwatch {
 	unsigned int start, end;
@@ -19,14 +39,29 @@ public:
 	unsigned int elapsed() { return end - start; }
 };
 
-
-void readData(string fileName, vector<int>& container) {
-	ifstream fdata(fileName.c_str());
-	std::copy(
-		std::istream_iterator<int>(fdata),
-		std::istream_iterator<int>(),
-		std::back_inserter(container));
-	fdata.close();
+// Creates a list the array
+// Values are the index of the next element
+// -1 denotes no successor
+void createList(int a[], int n) {
+	std::vector<int> ints(n);
+	for (int i=0 ; i<n ; i++)
+		ints[i] = i;
+	std::random_shuffle(ints.begin(), ints.end());
+	
+	for (int i=0 ; i+1<n ; i++)
+		a[ints[i]] = ints[i+1];
+	a[ints[n-1]] = -1;
+	
+	#ifndef NDEBUG
+	// Verify list
+	int cur = ints[0];
+	int count = 0;
+	while (cur != -1) {
+		cur = a[cur];
+		count++;
+	}
+	assert(count == n);
+	#endif
 }
 
 template <typename T>
@@ -52,94 +87,84 @@ int log2(int i) {
 
 int main(int argc, char *args[])
 {
-	cout << "Started" << endl;
-	stopwatch swRead, swParallel, swWrite;
-
-	// Read arguments
-	string inFilename("data.txt"), outFilename("output.txt");
-	for (int i = 0; i < argc; i++) {
-		string arg(args[i]);
-		if (arg == "-i")
-			inFilename = args[++i];
-		if (arg == "-o")
-			outFilename = args[++i];
-	}
-
-	// Read data
-	vector<int> list;
-	readData(inFilename, list);
-	int n = list.size();
-	int logn = log2(n);
-	for (int i = 0; i < list.size(); i++)
-		list[i]--; // Switch to zero-based
-
-	// Calculate
-	int *distance = new int[n];
-	int *distanceNew = new int[n];
-	int *jumplist = new int[n];
-	int *jumplistNew = new int[n];
+	stopwatch sw;
+	int nthreads = 8;
 	int i;
+	
+	cout << "N | 1 threads | 2 threads | 4 threads | x threads " << endl;
+	
+	for (int c=0 ; c<NSIZE ; c++) {	
+		int n = Ns[c];
+		
+		// Generate random input of size n
+		int *list = new int[n];
+		createList(list, n);
+		
+		cout << n << " | ";
+		int *distance = distance1;
+		int *jumplist = jumplist1;
+		int *distanceNew = distance2;
+		int *jumplistNew = jumplist2;
+		
+		for (int nthreads=1 ; nthreads<=MAXTHREADS ; nthreads <<= 1) {
+			
+			sw.restart();
+			
+			// Calculate
+			#pragma omp parallel num_threads(nthreads) shared(distance, distanceNew, jumplist, jumplistNew) private(i) // pointers are private, data is isn't
+			{
+				// Repeat test
+				for (int t=0 ; t<TIMES ; t++) {
+					int logn = log2(n);
+											
+					#pragma omp for schedule(static)
+					// initialize
+					for (i = 0; i < n; i++) {
+						distance[i] = distanceNew[i] = (list[i] == -1) ? 0 : 1;
+						jumplist[i] = jumplistNew[i] = list[i];
+					}
 
-	swRead.stop();
-	swParallel.restart();
-
-	#pragma omp parallel shared(distance, distanceNew, jumplist, jumplistNew) private(i) // pointers are private, data is isn't
-	{
-		#pragma omp for schedule(static)
-		// initialize
-		for (i = 0; i < n; i++) {
-			distance[i] = distanceNew[i] = (list[i] == -1) ? 0 : 1;
-			jumplist[i] = jumplistNew[i] = list[i];
-		}
-
-		// jump pointers
-		for (int y = 0; y < logn ; y++) {
-			#pragma omp for schedule(static)
-			for (i = 0; i < n; i++) {
-				if (jumplist[i] != -1) {
-					distanceNew[i] = distance[i] + distance[jumplist[i]];
-					jumplistNew[i] = jumplist[jumplist[i]];
-				}
-				else {
-					distanceNew[i] = distance[i];
-					jumplistNew[i] = jumplist[i];
-				}
+					// jump pointers
+					for (int y = 0; y < logn ; y++) {
+						#pragma omp for schedule(static)
+						for (i = 0; i < n; i++) {
+							if (jumplist[i] != -1) {
+								distanceNew[i] = distance[i] + distance[jumplist[i]];
+								jumplistNew[i] = jumplist[jumplist[i]];
+							}
+							else {
+								distanceNew[i] = distance[i];
+								jumplistNew[i] = jumplist[i];
+							}
+						}
+		
+						#pragma omp single
+						{
+							swap(jumplist, jumplistNew);
+							swap(distance, distanceNew);
+						}
+					}
+				}	
 			}
 			
-			#pragma omp single
-			{
-				swap(jumplist, jumplistNew);
-				swap(distance, distanceNew);
-			}
+			sw.stop();
+		
+			cout << sw.elapsed() << " | ";	
 		}
+		
+		cout << endl;
+		
+		#ifndef NDEBUG
+		// Verify that the execution completed
+		bool completed = true;
+		for (int i = 0; i < n; i++)
+			completed = completed && jumplist[i] == -1;
+		if (!completed)
+			cout << "ERROR: Jumps not completed" << endl;
+		#endif
+		
+		
 	}
-
-	swParallel.stop();
-	swWrite.restart();
-
-	// Write result to file
-	fstream fout(outFilename.c_str(), fstream::out);
-	for (int i = 0; i < n; i++)
-		fout << distance[i] << " ";
-	fout << endl;
-	fout.close();
-
-	swWrite.stop();
-
-#ifndef NDEBUG
-	bool completed = true;
-	for (int i = 0; i < n; i++)
-		completed = completed && jumplist[i] == -1;
-	if (!completed)
-		cout << "ERROR: Jumps not completed" << endl;
-	//print(jumplist, n);
-	print(distance, n);
-#endif
-
-	cout << "Completed" << endl;
-	cout << swRead.elapsed() << "ms read" << endl;
-	cout << swParallel.elapsed() << "ms parallel" << endl;
-	cout << swWrite.elapsed() << "ms write" << endl;
 
 #ifdef _WIN32
 	string dummy;
