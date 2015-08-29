@@ -88,10 +88,10 @@ int log2(int i) {
 int main(int argc, char *args[])
 {
 	stopwatch sw;
-	int nthreads = 8;
+	int nthreads;
 	int i;
 	
-	cout << "N | 1 threads | 2 threads | 4 threads | x threads " << endl;
+	cout << "N | 1 threads | 2 threads | 4 threads | 8 threads " << endl;
 	
 	for (int c=0 ; c<NSIZE ; c++) {	
 		int n = Ns[c];
@@ -111,7 +111,7 @@ int main(int argc, char *args[])
 			sw.restart();
 			
 			// Calculate
-			#pragma omp parallel num_threads(nthreads) shared(distance, distanceNew, jumplist, jumplistNew) private(i) // pointers are private, data is isn't
+			#pragma omp parallel num_threads(nthreads) shared(distance, distanceNew, jumplist, jumplistNew) private(i)
 			{
 				// Repeat test
 				for (int t=0 ; t<TIMES ; t++) {
