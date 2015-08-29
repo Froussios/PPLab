@@ -177,9 +177,9 @@ void seq_function(int n){
 int boundary_first(int rank, int numThreads, int size) {
 	if (numThreads <= size) // If more data than threads, make chunks
 		return rank * (size / numThreads);
-	else if (rank < size) // else, one item per thread
+	else if (rank < size)   // else, one item per thread
 		return rank;
-	else // and some threads get nothing
+	else                    // and some threads get nothing
 		return 0;
 }
 int boundary_last(int rank, int numThreads, int size) {
@@ -215,17 +215,26 @@ void* par_function(void* a) {
 		
 		// Construct minima tree
 		for (int h=logn-1 ; h>=0 ; h--) {
-			leveln /= 2;			
-			for (int i=0 ; i<leveln ; i++) {
+			leveln /= 2;
+			
+			first = boundary_first(threadRank, threadCount, leveln);
+			last = boundary_last(threadRank, threadCount, leveln);
+			for (int i=first ; i<last ; i++) {
 				expand[index(h, i)] = min(expand[index(h+1, 2*i)], expand[index(h+1, 2*i+1)]);
 			}
+			
+			// Wait for this level of the tree to complete
+			pthread_barrier_wait(&phase_barr);
 		}
 	
 		// Prefix minima
 		leveln = 1;
 		for (int h=0 ; h<=logn ; h++) {
 			assert(leveln < 2*n);
-			for (int i=0 ; i<leveln ; i++) {				
+			
+			first = boundary_first(threadRank, threadCount, leveln);
+			last = boundary_last(threadRank, threadCount, leveln);
+			for (int i=first ; i<last ; i++) {				
 				if (i == 0)
 					reduce[index(h, i)] = expand[index(h, i)];
 				else if (i % 2 == 1)
@@ -244,7 +253,9 @@ void* par_function(void* a) {
 		}
 	
 		// Copy result to result container
-		for (int i=0 ; i<n ; i++)
+		first = boundary_first(threadRank, threadCount, n);
+		last = boundary_last(threadRank, threadCount, n);
+		for (int i=first ; i<last ; i++)
 			prefix[i] = reduce[index(logn, i)];
 		
 		// Finish with prefix before doing suffix
@@ -254,7 +265,10 @@ void* par_function(void* a) {
 		leveln = 1;
 		for (int h=0 ; h<=logn ; h++) {
 			assert(leveln < 2*n);
-			for (int i=0 ; i<leveln ; i++) {				
+			
+			first = boundary_first(threadRank, threadCount, leveln);
+			last = boundary_last(threadRank, threadCount, leveln);
+			for (int i=first ; i<last ; i++) {				
 				if (i == 0)
 					reduce[index_rev(h, i)] = expand[index_rev(h, i)];
 				else if (i % 2 == 1)
@@ -273,7 +287,9 @@ void* par_function(void* a) {
 		}
 		
 		// Copy result to result container
-		for (int i=0 ; i<n ; i++)
+		first = boundary_first(threadRank, threadCount, n);
+		last = boundary_last(threadRank, threadCount, n);
+		for (int i=first ; i<last ; i++)
 			suffix[i] = reduce[index(logn, i)];
 	}
 	
