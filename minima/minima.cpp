@@ -12,16 +12,16 @@
 using namespace std;
 
 // Number of threads
-#define NUM_THREADS 32
+#define NUM_THREADS 32 // TODO 32
 
 // Number of iterations
-#define TIMES 1
+#define TIMES 10
 
 // Input Size
-#define NSIZE 1
+#define NSIZE 7 // 7 // TODO
 #define NMAX 262144
-//int Ns[NSIZE] = {1, 4096, 8192, 16384, 32768, 65536, 131072, 262144};   
-int Ns[NSIZE] = {8};   
+int Ns[NSIZE] = {4096, 8192, 16384, 32768, 65536, 131072, 262144};   
+//int Ns[NSIZE] = {32};   
 
 typedef struct __ThreadArg {
   int id;
@@ -32,15 +32,11 @@ typedef struct __ThreadArg {
 
 pthread_t callThd[NUM_THREADS];
 pthread_mutex_t mutexpm;
-pthread_barrier_t completed_barr, internal_barr;
+pthread_barrier_t completed_barr, internal_barr, phase_barr;
 
 // Seed Input
 int A[NMAX];
 
-// Subset
-int B[NMAX];
-
-// Temporary calculations
 int expand[NMAX*2];
 int reduce[NMAX*2];
 
@@ -67,15 +63,45 @@ int min(int a, int b) {
 
 
 void init(int n){
+	// Populate the base of the tree
+	int logn = ceil(log2(n));
 	for (int i=0 ; i<n ; i++)
-		B[i] = A[i];
+		expand[index(logn, i)] = A[i];
 }
 
-string print(int a[], int n) {
+string toString(int a[], int n) {
 	ostringstream oss;
 	for (int i=0 ; i<n ; i++)
 		oss << a[i] << ",";
 	return oss.str();
+}
+
+// Perform simple tests to verify correct execution
+void testResult(int n) {
+	#ifndef NDEBUG
+	bool pass;
+	
+	pass = true;
+	for (int i=1 ; i<n ; i++)
+		if (prefix[i-1] < prefix[i])
+			pass = false;
+	if (!pass) {
+		cerr << "[ERROR 1]" << endl;
+		cerr << "[" << toString(expand, n) << "]" << endl;
+		cerr << "[" << toString(prefix, n) << "]" << endl;
+	}
+	
+	pass = true;
+	for (int i=1 ; i<n ; i++)
+		if (suffix[i-1] > suffix[i])
+			pass = false;
+	if (!pass) {
+		cerr << "[ERROR 2]" << endl;
+		cerr << "[" << toString(expand, n) << "]" << endl;
+		cerr << "[" << toString(suffix, n) << "]" << endl;
+	}
+	
+	#endif
 }
 
 void seq_function(int n){
@@ -84,12 +110,9 @@ void seq_function(int n){
 	int logn = ceil(log2(n));
 	
 	#ifndef NDEBUG
-	for (int i=0 ; i<n*2 ; i++)
-		expand[i] = reduce[i] = -1;
+	//for (int i=0 ; i<n*2 ; i++)
+	//	expand[i] = reduce[i] = -1;
 	#endif
-	
-	for (int i=0 ; i<n ; i++)
-		expand[index(logn, i)] = B[i];
 		
 	// Construct minima tree
 	
@@ -120,8 +143,10 @@ void seq_function(int n){
 		leveln *= 2;
 	}
 	
+	// Copy to result container
 	for (int i=0 ; i<n ; i++)
 		prefix[i] = reduce[index(logn, i)];
+		
 		
 	// Suffix minima
 	
@@ -141,16 +166,117 @@ void seq_function(int n){
 			}
 		}
 		leveln *= 2;
+	}
+	
+	// Copy to result container
+	for (int i=0 ; i<n ; i++)
+		suffix[i] = reduce[index(logn, i)];
+}
+
+// Determine boundaries for this thread
+int boundary_first(int rank, int numThreads, int size) {
+	if (numThreads <= size) // If more data than threads, make chunks
+		return rank * (size / numThreads);
+	else if (rank < size) // else, one item per thread
+		return rank;
+	else // and some threads get nothing
+		return 0;
+}
+int boundary_last(int rank, int numThreads, int size) {
+	if (numThreads <= size)
+		return (rank == numThreads-1) ? 
+			size : (rank + 1) * (size / numThreads);
+	else if (rank < size)
+		return rank + 1;
+	else
+		return 0;
+}
+
+void* par_function(void* a) {
+	tThreadArg *args = (tThreadArg*) a;
+	int threadRank = args->id - 1;
+	int threadCount = args->nrT;
+	int n = args->n;
+	
+	int first, last; // The range that this thread will work on
+
+	for (int t=0 ; t<TIMES ; t++) {
+		// Wait for initialisation to complete
+		pthread_barrier_wait(&internal_barr);
 		
+		int leveln = n;
+		int height;	
+		int logn = ceil(log2(n));
+	
+		#ifndef NDEBUG
+		//for (int i=0 ; i<n*2 ; i++)
+		//	expand[i] = reduce[i] = -1;
+		#endif
+		
+		// Construct minima tree
+		for (int h=logn-1 ; h>=0 ; h--) {
+			leveln /= 2;			
+			for (int i=0 ; i<leveln ; i++) {
+				expand[index(h, i)] = min(expand[index(h+1, 2*i)], expand[index(h+1, 2*i+1)]);
+			}
+		}
+	
+		// Prefix minima
+		leveln = 1;
+		for (int h=0 ; h<=logn ; h++) {
+			assert(leveln < 2*n);
+			for (int i=0 ; i<leveln ; i++) {				
+				if (i == 0)
+					reduce[index(h, i)] = expand[index(h, i)];
+				else if (i % 2 == 1)
+					reduce[index(h, i)] = reduce[index(h-1, i/2)];
+				else {
+					if (expand[index(h, i+1)] != reduce[index(h-1, i/2)])
+						reduce[index(h, i)] = reduce[index(h-1, i/2)];
+					else
+						reduce[index(h, i)] = reduce[index(h, i-1)];
+				}
+			}
+			leveln *= 2;
+			
+			// Wait for this level of the tree to complete
+			pthread_barrier_wait(&phase_barr);
+		}
+	
+		// Copy result to result container
+		for (int i=0 ; i<n ; i++)
+			prefix[i] = reduce[index(logn, i)];
+		
+		// Finish with prefix before doing suffix
+		pthread_barrier_wait(&phase_barr);
+		
+		// Suffix minima
+		leveln = 1;
+		for (int h=0 ; h<=logn ; h++) {
+			assert(leveln < 2*n);
+			for (int i=0 ; i<leveln ; i++) {				
+				if (i == 0)
+					reduce[index_rev(h, i)] = expand[index_rev(h, i)];
+				else if (i % 2 == 1)
+					reduce[index_rev(h, i)] = reduce[index_rev(h-1, i/2)];
+				else {
+					if (expand[index_rev(h, i+1)] != reduce[index_rev(h-1, i/2)])
+						reduce[index_rev(h, i)] = reduce[index_rev(h-1, i/2)];
+					else
+						reduce[index_rev(h, i)] = reduce[index_rev(h, i-1)];
+				}
+			}
+			leveln *= 2;
+			
+			// Wait for this level of the tree to complete
+			pthread_barrier_wait(&phase_barr);			
+		}
+		
+		// Copy result to result container
 		for (int i=0 ; i<n ; i++)
 			suffix[i] = reduce[index(logn, i)];
 	}
-}
-
-void* par_function(void* a){
-	for (int t=0 ; t<TIMES ; t++) {
-		pthread_barrier_wait(&internal_barr);
-	}
+	
 	pthread_barrier_wait(&completed_barr);
 	pthread_exit(0);
 }
@@ -169,7 +295,7 @@ int main (int argc, char *argv[])
 	/* Generate a seed input */
 	srand ( time(NULL) );
 	for(k=0; k<NMAX; k++){
-		A[k] = rand();
+		A[k] = rand() % 100; // Remove cap
 	}
 	
 
@@ -193,31 +319,27 @@ int main (int argc, char *argv[])
 		}
 		gettimeofday (&endt, NULL);
 		
-		#ifndef NDEBUG
-		bool success = true;
-		for (int i=1 ; i<n ; i++)
-			if (prefix[i-1] < prefix[i])
-				success = false;
-			else if (suffix[i] < suffix[i-1])
-				success = false;
-		if (!success)
-			cerr << "ERROR: SEQ: faulty results ";
-		#endif
+		testResult(n);
 			
 		result.tv_usec = (endt.tv_sec*1000000+endt.tv_usec) - (startt.tv_sec*1000000+startt.tv_usec);
 		printf(" %ld.%06ld | ", result.tv_usec/1000000, result.tv_usec%1000000);
 
 		/* Run threaded algorithm(s) */
 		for(nt=1; nt<NUM_THREADS; nt=nt<<1){
-		        if(pthread_barrier_init(&completed_barr, NULL, nt+1))
-    			{
-        			printf("Could not create a barrier\n");
-			        return -1;
+	        if(pthread_barrier_init(&completed_barr, NULL, nt+1))
+			{
+    			printf("Could not create a barrier\n");
+		        return -1;
 			}
-		        if(pthread_barrier_init(&internal_barr, NULL, nt+1))
-    			{
-        			printf("Could not create a barrier\n");
-			        return -1;
+	        if(pthread_barrier_init(&internal_barr, NULL, nt+1))
+			{
+    			printf("Could not create a barrier\n");
+		        return -1;
+			}
+			if(pthread_barrier_init(&phase_barr, NULL, nt))
+			{
+    			printf("Could not create a barrier\n");
+		        return -1;
 			}
 
 			result.tv_sec=0; result.tv_usec=0;
@@ -238,16 +360,7 @@ int main (int argc, char *argv[])
 			pthread_barrier_wait(&completed_barr);
 			gettimeofday (&endt, NULL);
 			
-			#ifndef NDEBUG
-			bool success = true;
-			for (int i=1 ; i<n ; i++)
-				if (prefix[i-1] < prefix[i])
-					success = false;
-				else if (suffix[i] < suffix[i-1])
-					success = false;
-			if (!success)
-				cerr << "ERROR: PAR: faulty results ";
-			#endif
+			testResult(n);
 
 			/* Wait on the other threads */
 			for(j=0; j</*NUMTHRDS*/nt; j++)
@@ -260,6 +373,10 @@ int main (int argc, char *argv[])
 			        return -1;
 			}
 			if (pthread_barrier_destroy(&internal_barr)) {
+        			printf("Could not destroy the barrier\n");
+			        return -1;
+			}
+			if (pthread_barrier_destroy(&phase_barr)) {
         			printf("Could not destroy the barrier\n");
 			        return -1;
 			}
