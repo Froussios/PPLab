@@ -5,12 +5,39 @@
 #include <math.h>
 #include <assert.h>
 
+// Number of threads
+#define NUM_THREADS 8 // TODO 32
+
+// Number of iterations
+#define TIMES 100
+
+// Input Size
+#define NSIZE 7
+#define NMAX 262144
+int Ns[NSIZE] = {4096, 8192, 16384, 32768, 65536, 131072, 262144};
+
+// Seed Input
+int A[NMAX];
+
+int expand[NMAX*2];
+int reduce[NMAX*2];
+
+// Output 
+int prefix[NMAX];
+int suffix[NMAX];
+ 
+
 using namespace std;
 
 
-
-template<class T, size_t N>
-size_t size(T(&)[N]) { return N; }
+class stopwatch {
+	unsigned int start, end;
+public:
+	stopwatch() { restart(); }
+	void restart() { start = clock(); }
+	void stop() { end = clock(); }
+	unsigned int elapsed() { return end - start; }
+};
 
 int index(int height, int i) {
 	return (1 << height) - 1 + i;
@@ -28,109 +55,120 @@ int min(int a, int b) {
 string arrayToString(int data[], int dataCount) {
 	stringstream ss;
 	for (int i = 0; i < dataCount; i++) {
-		ss << setfill(' ') << setw(4) << data[i] << ", ";
+		ss << setfill(' ') << setw(4) << data[i] << " ";
 	}
 	return ss.str();
 }
 
 
-void openmpMinima(int data[], int n, int prefix[], int suffix[]) {
-	int leveln = n;
-	int height;
-	int expand[n*2];
-	int reduce[n*2];	
-	int logn = ceil(log2(n));
-	
-	for (int i=0 ; i<n*2 ; i++)
-		expand[i] = reduce[i] = -1;
-	
-	for (int i=0 ; i<n ; i++)
-		expand[index(logn, i)] = data[i];
-	
-	{
-		for (int h=logn-1 ; h>=0 ; h--) {
-			leveln /= 2;			
-			for (int i=0 ; i<leveln ; i++) {
-				expand[index(h, i)] = min(expand[index(h+1, 2*i)], expand[index(h+1, 2*i+1)]);
-			}
-		}
-		
-		// Prefix minima
-		
-		leveln = 1;
-		for (int h=0 ; h<=logn ; h++) {
-			assert(leveln < 2*n);
-			for (int i=0 ; i<leveln ; i++) {				
-				if (i == 0)
-					reduce[index(h, i)] = expand[index(h, i)];
-				else if (i % 2 == 1)
-					reduce[index(h, i)] = reduce[index(h-1, i/2)];
-				else {
-					if (expand[index(h, i+1)] != reduce[index(h-1, i/2)])
-						reduce[index(h, i)] = reduce[index(h-1, i/2)];
-					else
-						reduce[index(h, i)] = reduce[index(h, i-1)];
-				}
-			}
-			leveln *= 2;
-		}
-		
-		// Copy to result container
-		for (int i=0 ; i<n ; i++)
-			prefix[i] = reduce[index(logn, i)];
-			
-		// Suffix minima
-		
-		leveln = 1;
-		for (int h=0 ; h<=logn ; h++) {
-			assert(leveln < 2*n);
-			for (int i=0 ; i<leveln ; i++) {				
-				if (i == 0)
-					reduce[index_rev(h, i)] = expand[index_rev(h, i)];
-				else if (i % 2 == 1)
-					reduce[index_rev(h, i)] = reduce[index_rev(h-1, i/2)];
-				else {
-					if (expand[index_rev(h, i+1)] != reduce[index_rev(h-1, i/2)])
-						reduce[index_rev(h, i)] = reduce[index_rev(h-1, i/2)];
-					else
-						reduce[index_rev(h, i)] = reduce[index_rev(h, i-1)];
-				}
-			}
-			leveln *= 2;
-		}
-		
-		// Copy to result container
-		for (int i=0 ; i<n ; i++)
-			suffix[i] = reduce[index(logn, i)];
-	}
-	
-}
-
 main ()
 {
-	//int data[] =
-	//{
-	//	58,   89,   32,   73,   131,  156,   30,   29,
-	//	141,   37,   133,  151,   88,   53,   122,  126,
-	//	131,  49,   130,  115,   16,   83,   40,   145,
-	//	10,   112,   20,   147,   14,   104,  111,   92
-	//};
-	int data[] = {5, 10, 7, 2, 12, 8, 9, 6};
-	int dataCount = size(data);
-
-	//cout << "Starting calculations" << endl;
-	//cout << "Data size: " << dataCount << endl;
-
-	int *prefices = new int[dataCount];
-	int *suffices = new int[dataCount];
-
-	openmpMinima(data, dataCount, prefices, suffices);
-
-	//cout << "Data: " << arrayToString(data, dataCount) << endl;
-	//cout << "Pref: " << arrayToString(prefices, dataCount) << endl;
-	//cout << "Suff: " << arrayToString(suffices, dataCount) << endl;
+	stopwatch sw;
+	int nthreads;
+	int i;
 	
-	//cout << "Check: " << verify(data, dataCount, prefices, suffices) << endl;
+	cout << "N | # | 1 threads | 2 threads | 4 threads | 8 threads " << endl;
+	
+	for (int c=0 ; c<NSIZE ; c++) {	
+		int n = Ns[c];
+		
+		cout << n << " | " << TIMES << " | ";
+		
+		for (int nthreads=1 ; nthreads<=NUM_THREADS ; nthreads <<= 1) {
+			
+			sw.restart();
+			
+			#pragma omp parallel shared(reduce, expand) private(i)
+			{
+				for (int t=0 ; t<TIMES ; t++) {
+					int leveln = n;
+					int height;	
+					int logn = ceil(log2(n));
+	
+					#ifndef NDEBUG
+					for (int i=0 ; i<n*2 ; i++)
+						expand[i] = reduce[i] = -1;
+					#endif
+		
+					// Construct minima tree
+	
+					for (int h=logn-1 ; h>=0 ; h--) {
+						leveln /= 2;
+						#pragma omp for	
+						for (int i=0 ; i<leveln ; i++) {
+							expand[index(h, i)] = min(expand[index(h+1, 2*i)], expand[index(h+1, 2*i+1)]);
+						}
+					}
+	
+					// Prefix minima
+	
+					leveln = 1;
+					for (int h=0 ; h<=logn ; h++) {
+						assert(leveln < 2*n);
+						
+						#pragma omp for	
+						for (int i=0 ; i<leveln ; i++) {				
+							if (i == 0)
+								reduce[index(h, i)] = expand[index(h, i)];
+							else if (i % 2 == 1)
+								reduce[index(h, i)] = reduce[index(h-1, i/2)];
+							else {
+								if (expand[index(h, i+1)] != reduce[index(h-1, i/2)])
+									reduce[index(h, i)] = reduce[index(h-1, i/2)];
+								else
+									reduce[index(h, i)] = reduce[index(h, i-1)];
+							}
+						}
+						leveln *= 2;
+					}
+	
+					// Copy to result container
+					#pragma omp for	
+					for (int i=0 ; i<n ; i++)
+						prefix[i] = reduce[index(logn, i)];
+		
+		
+					// Suffix minima
+	
+					leveln = 1;
+					for (int h=0 ; h<=logn ; h++) {
+						assert(leveln < 2*n);
+						
+						#pragma omp for	
+						for (int i=0 ; i<leveln ; i++) {				
+							if (i == 0)
+								reduce[index_rev(h, i)] = expand[index_rev(h, i)];
+							else if (i % 2 == 1)
+								reduce[index_rev(h, i)] = reduce[index_rev(h-1, i/2)];
+							else {
+								if (expand[index_rev(h, i+1)] != reduce[index_rev(h-1, i/2)])
+									reduce[index_rev(h, i)] = reduce[index_rev(h-1, i/2)];
+								else
+									reduce[index_rev(h, i)] = reduce[index_rev(h, i-1)];
+							}
+						}
+						leveln *= 2;
+					}
+	
+					// Copy to result container
+					#pragma omp for	
+					for (int i=0 ; i<n ; i++)
+						suffix[i] = reduce[index(logn, i)];
+				}
+			}
+			
+			sw.stop();
+		
+			cout << sw.elapsed() << " | ";	
+		}
+		
+		cout << endl;		
+	}
 
-	return 0;
+#ifdef _WIN32
+	string dummy;
+	getline(cin, dummy);
+#endif
+
+    return 0;
 }
