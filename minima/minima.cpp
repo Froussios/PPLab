@@ -6,6 +6,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <limits>
 #include <sys/time.h>
 #include <assert.h>
 
@@ -15,13 +16,12 @@ using namespace std;
 #define NUM_THREADS 32 // TODO 32
 
 // Number of iterations
-#define TIMES 10
+#define TIMES 100
 
 // Input Size
-#define NSIZE 7 // 7 // TODO
+#define NSIZE 7
 #define NMAX 262144
-int Ns[NSIZE] = {4096, 8192, 16384, 32768, 65536, 131072, 262144};   
-//int Ns[NSIZE] = {32};   
+int Ns[NSIZE] = {4096, 8192, 16384, 32768, 65536, 131072, 262144};    
 
 typedef struct __ThreadArg {
   int id;
@@ -297,6 +297,71 @@ void* par_function(void* a) {
 	pthread_exit(0);
 }
 
+
+// Instead of speedtests, show a readable correctness test
+int presentCorrectness() {
+	const int N = 16;
+	const int nt = 4;
+	void *status;
+   	pthread_attr_t attr;
+  	tThreadArg x[NUM_THREADS];
+	
+	srand ( time(NULL) );
+	for(int k=0; k<N; k++){
+		A[k] = rand() % 100; // Readable numbers
+	}
+	
+	cout << "Input: " << toString(A, N) << endl;
+	
+	cout << "Sequential:" << endl;
+	init(N);
+	seq_function(N);
+	cout << "Prefix: " << toString(prefix, N) << endl;
+	cout << "Suffix: " << toString(suffix, N) << endl;
+	
+	
+	cout << "Parallel: 4 threads" << endl;
+	
+	/* Initialize and set thread detached attribute */
+   	pthread_attr_init(&attr);
+   	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	if(pthread_barrier_init(&completed_barr, NULL, nt+1) ||
+			pthread_barrier_init(&internal_barr, NULL, nt+1) ||
+			pthread_barrier_init(&phase_barr, NULL, nt)) {
+		printf("Could not create a barrier\n");
+        return -1;
+	}
+
+	for (int j=1; j<=nt; j++)
+		{
+		x[j].id = j; 
+		x[j].nrT=nt; // number of threads in this round
+		x[j].n=N;  //input size
+		pthread_create(&callThd[j-1], &attr, par_function, (void *)&x[j]);
+	}
+
+	for (int t=0; t<TIMES; t++) // Repetitions are built into the parallel function
+	{
+		init(N);
+		pthread_barrier_wait(&internal_barr);
+	}
+	pthread_barrier_wait(&completed_barr);
+
+	/* Wait on the other threads */
+	for(int j=0; j<nt; j++)
+		pthread_join(callThd[j], &status);
+
+	if (pthread_barrier_destroy(&completed_barr) ||
+			pthread_barrier_destroy(&internal_barr) ||
+			pthread_barrier_destroy(&phase_barr)) {
+		printf("Could not destroy the barrier\n");
+        return -1;
+	}
+	
+	cout << "Prefix: " << toString(prefix, N) << endl;
+	cout << "Suffix: " << toString(suffix, N) << endl;	
+}
+
 int main (int argc, char *argv[])
 {
   	struct timeval startt, endt, result;
@@ -304,6 +369,11 @@ int main (int argc, char *argv[])
 	void *status;
    	pthread_attr_t attr;
   	tThreadArg x[NUM_THREADS];
+  	
+  	if (argc > 1 && string(argv[1]) == "correctness") {
+  		return presentCorrectness();
+  	}
+  		
 	
   	result.tv_sec = 0;
   	result.tv_usec= 0;
@@ -311,7 +381,7 @@ int main (int argc, char *argv[])
 	/* Generate a seed input */
 	srand ( time(NULL) );
 	for(k=0; k<NMAX; k++){
-		A[k] = rand() % 100; // Remove cap
+		A[k] = rand();
 	}
 	
 
