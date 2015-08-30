@@ -55,30 +55,18 @@ int binaryRank(int a[], int start, int end, int item) {
 		return binaryRank(a, start, mid, item);
 }
 
-#ifndef NDEBUG
 bool isIncreasing(int a[], int n) {
 	for (int i=0 ; i<n-1 ; i++)
-		if (v[i] >= v[i+1])
+		if (a[i] >= a[i+1])
 			return false;
 	return true;
 }
-#endif
 
 
 int main(int argc, char *args[])
 {
 	stopwatch sw;
 	int i;
-
-	// Read arguments
-	string infile("data.txt"), outfile("output.txt");
-	for (int i = 0; i < argc; i++) {
-		string arg(args[i]);
-		if (arg == "-i")
-			infile = args[++i];
-		if (arg == "-o")
-			outfile = args[++i];
-	}
 
 	/* Generate input */
 	// Generate two sorted lists with no common items
@@ -113,7 +101,7 @@ int main(int argc, char *args[])
 			sw.restart();
 	
 			// Do merge
-			#pragma omp parallel num_threads(nthreads) shared(A, B, AB) private(i)
+			#pragma omp parallel num_threads(nthreads) shared(A, B, AB, ANs, BNs) private(i, sw, c, nthreads)
 			{
 				for (int t=0 ; t<TIMES ; t++) {
 					// Calculate (A:AB)
@@ -134,17 +122,15 @@ int main(int argc, char *args[])
 		
 			sw.stop();
 			
+			#ifndef NDEBUG
+			assert(isIncreasing(AB));
+			#endif
+			
 			cout << sw.elapsed() << " | ";
 		}
 		
 		cout << endl;
 	}
-
-	
-
-	#ifndef NDEBUG
-	assert(isIncreasing(AB));
-	#endif
 
 
 	#ifdef _WIN32
