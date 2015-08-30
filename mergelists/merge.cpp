@@ -41,6 +41,14 @@ int A[NMAX];
 int B[NMAX];
 int AB[2*NMAX];
 
+// For printing arrays
+string toString(int a[], int n) {
+	ostringstream oss;
+	for (int i=0 ; i<n ; i++)
+		oss << a[i] << ",";
+	return oss.str();
+}
+
 // calculate rank(item : a)
 int binaryRank(int a[], int start, int end, int item) {
 	if (start == end - 1)
@@ -127,6 +135,78 @@ void* par_function(void* a){
 	pthread_exit(0);
 }
 
+// Instead of speedtests, show a readable correctness test
+int presentCorrectness() {
+	const int AN = 32;
+	const int BN = 16;
+	const int nt = 4;
+	void *status;
+   	pthread_attr_t attr;
+  	tThreadArg x[NUM_THREADS];
+	
+	/* Generate input */
+	// Generate two sorted lists with no common items
+	srand ( time(NULL) );
+	int ia=0, ib=0;
+	int number = rand() % 5;
+	while (ia < AN && ib < BN)
+		if (rand() % 5 > 0) //A is 4x larger than B 
+			A[ia++] = number = number + 1 + (rand() % 5);
+		else
+			B[ib++] = number = number + 1 + (rand() % 5);
+	while (ia < AN)
+		A[ia++] = number = number + 1 + (rand() % 5);
+	while (ib < BN)
+		B[ib++] = number = number + 1 + (rand() % 5);
+	
+	cout << "Input A: " << toString(A, AN) << endl;
+	cout << "Input A: " << toString(B, BN) << endl;
+	
+	cout << "Sequential:" << endl;
+	init(AN, BN);
+	seq_function(AN, BN);
+	cout << "AB: " << toString(AB, AN+BN) << endl;
+	
+	
+	cout << "Parallel: 4 threads" << endl;
+	
+	/* Initialize and set thread detached attribute */
+   	pthread_attr_init(&attr);
+   	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	if(pthread_barrier_init(&completed_barr, NULL, nt+1) ||
+			pthread_barrier_init(&internal_barr, NULL, nt+1)) {
+		printf("Could not create a barrier\n");
+        return -1;
+	}
+
+	for (int j=1; j<=nt; j++) {
+		x[j].id = j; 
+		x[j].nrT=nt; // number of threads in this round
+		x[j].nA=AN;  //input size
+		x[j].nB=BN;
+		pthread_create(&callThd[j-1], &attr, par_function, (void *)&x[j]);
+	}
+
+	for (int t=0; t<TIMES; t++) // Repetitions are built into the parallel function
+	{
+		init(AN, BN);
+		pthread_barrier_wait(&internal_barr);
+		pthread_barrier_wait(&completed_barr);
+	}
+
+	/* Wait on the other threads */
+	for(int j=0; j<nt; j++)
+		pthread_join(callThd[j], &status);
+
+	if (pthread_barrier_destroy(&completed_barr) ||
+			pthread_barrier_destroy(&internal_barr)) {
+		printf("Could not destroy the barrier\n");
+        return -1;
+	}
+	
+	cout << "AB: " << toString(AB, AN+BN) << endl;
+}
+
 int main (int argc, char *argv[])
 {
   	struct timeval startt, endt, result;
@@ -134,6 +214,11 @@ int main (int argc, char *argv[])
 	void *status;
    	pthread_attr_t attr;
   	tThreadArg x[NUM_THREADS];
+  	
+ 	// If instructed, perform a correctness test
+  	if (argc > 1 && string(argv[1]) == "correctness") {
+  		return presentCorrectness();
+  	}
 	
   	result.tv_sec = 0;
   	result.tv_usec= 0;
