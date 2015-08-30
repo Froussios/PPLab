@@ -242,9 +242,6 @@ void* par_function(void* a) {
 			pthread_barrier_wait(&phase_barr);
 		}
 		
-		// Finish with prefix before doing suffix
-		pthread_barrier_wait(&phase_barr);
-		
 		// Suffix minima
 		leveln = 1;
 		for (int h=0 ; h<=logn ; h++) {

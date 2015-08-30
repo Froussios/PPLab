@@ -63,11 +63,11 @@ int log2(int i) {
 
 void init(int n){
 	/* Initialize the input for this iteration*/
-	
 	for (int i=0 ; i<n ; i++)
 		jumplist1[i] = list[i];
 }
 
+// Create a random list of length n onto a[]
 void createList(int a[], int n) {
 	std::vector<int> ints(n);
 	for (int i=0 ; i<n ; i++)
@@ -92,6 +92,7 @@ void createList(int a[], int n) {
 	#endif
 }
 
+// Execute algorithm sequentially
 void seq_function(int n){
 	int logn = log2(n);
 	
@@ -137,10 +138,8 @@ void seq_function(int n){
 	}
 }
 
-void* par_function(void* a){
-	/* The code for threaded computation */
-	// Perform operations on B
-	
+// Thread function for parallel execution
+void* par_function(void* a){	
 	tThreadArg *args = (tThreadArg*) a;
 	int threadRank = args->id - 1;
 	int threadCount = args->nrT;
