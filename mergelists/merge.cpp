@@ -21,7 +21,6 @@ using namespace std;
 // Input Size
 #define NSIZE 7
 #define NMAX 262144
-//int Ns[NSIZE] = {4096, 8192, 16384, 32768, 65536, 131072, 262144};
 int ANs[NSIZE] = {4096, 8192, 16384, 32768, 65536, 131072, 262144};   
 int BNs[NSIZE] = {1024, 2048, 4096, 8192, 16384, 32768, 65536};   
 
@@ -37,7 +36,7 @@ pthread_t callThd[NUM_THREADS];
 pthread_mutex_t mutexpm;
 pthread_barrier_t completed_barr, internal_barr;
 
-// Subset
+
 int A[NMAX];
 int B[NMAX];
 int AB[2*NMAX];
