@@ -6,6 +6,8 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
+#include <algorithm>
 #include <limits>
 #include <sys/time.h>
 #include <assert.h>
@@ -282,10 +284,17 @@ int presentCorrectness() {
    	pthread_attr_t attr;
   	tThreadArg x[NUM_THREADS];
 	
-	srand ( time(NULL) );
+	/* Generate a seed input */
+	// Construct a randomised array with no duplicates
+	vector<int> *ints = new vector<int>(N);
+	for (int k=0 ; k<N ; k++)
+		(*ints)[k] = k;
+	srand( time(NULL) );
+	std::random_shuffle (ints->begin(), ints->end());
 	for(int k=0; k<N; k++){
-		A[k] = rand() % 100; // Readable numbers
+		A[k] = (*ints)[k];
 	}
+	delete ints;
 	
 	cout << "Input: " << toString(A, N) << endl;
 	
@@ -354,10 +363,16 @@ int main (int argc, char *argv[])
   	result.tv_usec= 0;
 
 	/* Generate a seed input */
-	srand ( time(NULL) );
+	// Construct a randomised array with no duplicates
+	vector<int> *ints = new vector<int>(NMAX);
+	for (k=0 ; k<NMAX ; k++)
+		(*ints)[k] = k;
+	srand( time(NULL) );
+	std::random_shuffle (ints->begin(), ints->end());
 	for(k=0; k<NMAX; k++){
-		A[k] = rand();
+		A[k] = (*ints)[k];
 	}
+	delete ints;
 	
 
    	/* Initialize and set thread detached attribute */

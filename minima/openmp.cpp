@@ -2,6 +2,8 @@
 #include <iostream>
 #include <sstream>
 #include <iomanip>
+#include <vector>
+#include <algorithm>
 #include <math.h>
 #include <assert.h>
 
@@ -67,6 +69,19 @@ main ()
 	stopwatch sw;
 	int nthreads;
 	int i;
+	
+	/* Generate a seed input */
+	// Construct a randomised array with no duplicates
+	vector<int> *ints = new vector<int>(NMAX);
+	for (int k=0 ; k<NMAX ; k++)
+		(*ints)[k] = k;
+	srand( time(NULL) );
+	std::random_shuffle (ints->begin(), ints->end());
+	for(int k=0; k<NMAX; k++){
+		A[k] = (*ints)[k];
+	}
+	delete ints;
+	
 	
 	cout << "N | # | 1 threads | 2 threads | 4 threads | 8 threads " << endl;
 	
