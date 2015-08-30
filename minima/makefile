@@ -1,14 +1,12 @@
-all: openmp sequential pthreads 
+all: minima openmp
+
+minima: minima.cpp
+	g++ minima.cpp -pthread -o minima -DNDEBUG
 
 openmp: openmp.cpp
-	g++ openmp.cpp -fopenmp -o openmp
-
-sequential: sequential.cpp
-	g++ sequential.cpp -o sequential
-
-pthreads: pthreads.cpp
-	g++ pthreads.cpp -o pthreads
+	g++ openmp.cpp -fopenmp -o openmp -DNDEBUG
+	g++ openmp.cpp -o openmpseq -DNDEBUG
 
 clean:
-	rm openmp sequential pthreads
+	rm openmp minima openmpseq
 

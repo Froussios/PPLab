@@ -52,14 +52,6 @@ int log2(int i) {
 	return log;
 }
 
-// TODO remove debug utility
-std::string print(int a[], int n) {
-	std::ostringstream oss;
-	for (int i=0 ; i<n ; i++)
-		oss << std::setw(3) << a[i] << ' ';
-	oss << std::endl;
-	return oss.str();
-}
 
 void init(int n){
 	/* Initialize the input for this iteration*/

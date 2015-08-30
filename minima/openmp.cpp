@@ -75,6 +75,7 @@ void openmpMinima(int data[], int n, int prefix[], int suffix[]) {
 			leveln *= 2;
 		}
 		
+		// Copy to result container
 		for (int i=0 ; i<n ; i++)
 			prefix[i] = reduce[index(logn, i)];
 			
@@ -96,15 +97,12 @@ void openmpMinima(int data[], int n, int prefix[], int suffix[]) {
 				}
 			}
 			leveln *= 2;
-			
-			for (int i=0 ; i<n ; i++)
-				suffix[i] = reduce[index(logn, i)];
 		}
+		
+		// Copy to result container
+		for (int i=0 ; i<n ; i++)
+			suffix[i] = reduce[index(logn, i)];
 	}
-	
-	//cout << "data: " << arrayToString(data, n) << endl;
-	//cout << "pref: " << arrayToString(prefix, n) << endl;
-	//cout << "suff: " << arrayToString(suffix, n) << endl;
 	
 }
 

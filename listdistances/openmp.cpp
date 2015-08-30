@@ -13,7 +13,7 @@
 using namespace std;
 
 // Test repetitions
-#define TIMES 10
+#define TIMES 100
 
 // Input Size
 #define NSIZE 7
@@ -91,7 +91,7 @@ int main(int argc, char *args[])
 	int nthreads;
 	int i;
 	
-	cout << "N | 1 threads | 2 threads | 4 threads | 8 threads " << endl;
+	cout << "N | # | 1 threads | 2 threads | 4 threads | 8 threads " << endl;
 	
 	for (int c=0 ; c<NSIZE ; c++) {	
 		int n = Ns[c];
@@ -100,7 +100,7 @@ int main(int argc, char *args[])
 		int *list = new int[n];
 		createList(list, n);
 		
-		cout << n << " | ";
+		cout << n << " | " << TIMES << " | ";
 		int *distance = distance1;
 		int *jumplist = jumplist1;
 		int *distanceNew = distance2;
