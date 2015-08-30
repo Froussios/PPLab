@@ -20,11 +20,12 @@ int Ns[NSIZE] = {4096, 8192, 16384, 32768, 65536, 131072, 262144};
 int A[NMAX];
 
 int expand[NMAX*2];
-int reduce[NMAX*2];
 
-// Output 
-int prefix[NMAX];
-int suffix[NMAX];
+// Result containers
+// Copying is done to facilite checking the validity 
+// of the results outside of the parallel sections
+int prefix[NMAX*2];
+int suffix[NMAX*2];
  
 
 using namespace std;
@@ -78,7 +79,7 @@ main ()
 			
 			sw.restart();
 			
-			#pragma omp parallel shared(reduce, expand) private(i)
+			#pragma omp parallel shared(prefix, suffix, expand) private(i)
 			{
 				for (int t=0 ; t<TIMES ; t++) {
 					int leveln = n;
@@ -109,24 +110,18 @@ main ()
 						#pragma omp for	
 						for (int i=0 ; i<leveln ; i++) {				
 							if (i == 0)
-								reduce[index(h, i)] = expand[index(h, i)];
+								prefix[index(h, i)] = expand[index(h, i)];
 							else if (i % 2 == 1)
-								reduce[index(h, i)] = reduce[index(h-1, i/2)];
+								prefix[index(h, i)] = prefix[index(h-1, i/2)];
 							else {
-								if (expand[index(h, i+1)] != reduce[index(h-1, i/2)])
-									reduce[index(h, i)] = reduce[index(h-1, i/2)];
+								if (expand[index(h, i+1)] != prefix[index(h-1, i/2)])
+									prefix[index(h, i)] = prefix[index(h-1, i/2)];
 								else
-									reduce[index(h, i)] = reduce[index(h, i-1)];
+									prefix[index(h, i)] = prefix[index(h, i-1)];
 							}
 						}
 						leveln *= 2;
-					}
-	
-					// Copy to result container
-					#pragma omp for	
-					for (int i=0 ; i<n ; i++)
-						prefix[i] = reduce[index(logn, i)];
-		
+					}		
 		
 					// Suffix minima
 	
@@ -137,23 +132,18 @@ main ()
 						#pragma omp for	
 						for (int i=0 ; i<leveln ; i++) {				
 							if (i == 0)
-								reduce[index_rev(h, i)] = expand[index_rev(h, i)];
+								suffix[index_rev(h, i)] = expand[index_rev(h, i)];
 							else if (i % 2 == 1)
-								reduce[index_rev(h, i)] = reduce[index_rev(h-1, i/2)];
+								suffix[index_rev(h, i)] = suffix[index_rev(h-1, i/2)];
 							else {
-								if (expand[index_rev(h, i+1)] != reduce[index_rev(h-1, i/2)])
-									reduce[index_rev(h, i)] = reduce[index_rev(h-1, i/2)];
+								if (expand[index_rev(h, i+1)] != suffix[index_rev(h-1, i/2)])
+									suffix[index_rev(h, i)] = suffix[index_rev(h-1, i/2)];
 								else
-									reduce[index_rev(h, i)] = reduce[index_rev(h, i-1)];
+									suffix[index_rev(h, i)] = suffix[index_rev(h, i-1)];
 							}
 						}
 						leveln *= 2;
 					}
-	
-					// Copy to result container
-					#pragma omp for	
-					for (int i=0 ; i<n ; i++)
-						suffix[i] = reduce[index(logn, i)];
 				}
 			}
 			
