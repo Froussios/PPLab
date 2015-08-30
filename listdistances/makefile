@@ -5,7 +5,8 @@ distances: distances.cpp
 
 openmp: openmp.cpp
 	g++ openmp.cpp -fopenmp -o openmp -DNDEBUG
+	g++ openmp.cpp -o openmpseq -DNDEBUG
 
 clean:
-	rm distances openmp
+	rm distances openmp openmpseq
 
